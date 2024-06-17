@@ -7,11 +7,12 @@ import yfinance as yf
 
 class YahooDataSource:
 
-    def __init__(self,start_date,end_date,tickers,columns):
+    def __init__(self,start_date,end_date,tickers,columns,interval):
         self.tickers = tickers
         self.columns = columns
         self.start_date = start_date
         self.end_date = end_date
+        self.interval = interval
         self.data  = self.get_yahoo_data()
 
     def get_yahoo_data(self):
@@ -21,7 +22,7 @@ class YahooDataSource:
             
             try:
                 ticker = yf.Ticker(symbol)
-                hist = ticker.history(start=self.start_date, end=self.end_date)
+                hist = ticker.history(start=self.start_date, end=self.end_date,interval=self.interval)
                 hist.reset_index(inplace=True)
                 if not hist.empty:
                     for col in self.columns:
