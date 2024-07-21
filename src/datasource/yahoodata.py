@@ -127,3 +127,35 @@ class YahooDataSource:
     def get_tickers(self, ticker_columns):
 
         return [i.split("_")[0] for i in ticker_columns]
+    
+
+    def get_data(self, columns=-1):
+        # if n < 1:
+        #     warnings.warn("Number of days should be greater than 0")
+        #     return
+
+        # if n >= self.data[self.tickers[0]].shape[0]:
+        #     warnings.warn("Number of days is greater than the available data")
+        #     return
+        all_columns = self.columns
+
+        if columns == -1:
+            columns = all_columns
+
+        validated_columns = list(set(columns).intersection(all_columns))
+
+        if len(self.tickers) == 0:
+            warnings.warn("No tickers available")
+            return
+
+        data = pd.DataFrame()
+     
+        for ticker in self.tickers:
+            data[ticker] = self.data[ticker].loc[:,validated_columns]
+
+        # convert to dataframe
+        # data = pd.DataFrame(
+        #     {key: data[key].values.flatten() for key in data}
+        # )
+
+        return data
