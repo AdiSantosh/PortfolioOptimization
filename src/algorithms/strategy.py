@@ -42,7 +42,6 @@ class ConstrainedBasedStrategy(Strategy):
               current_date  = current_date + pd.DateOffset(strategy_frequency)
 
         for index,date in enumerate(date_range[:-2]):
-            print("hi")
 
             start_date = date - pd.DateOffset(test_size) 
             end_date = date
@@ -183,9 +182,6 @@ class MeanSemidevOpt(ConstrainedBasedStrategy):
         opt = optimize.linprog(c=obj, A_ub=lhs_ineq, b_ub=rhs_ineq,A_eq=lhs_eq,b_eq=rhs_eq, bounds=bnd,method="highs")
         return opt
         
-    
-    # def run_startegy(self,price_data,test_size=30*3,allocation_frequency = 30):
-    #     return super().run_startegy(price_data,test_size,allocation_frequency)
 
 
 class EqualyWeighted(Strategy):
@@ -206,18 +202,3 @@ class EqualyWeighted(Strategy):
         self.num_assets = len(self.array[:,0])
         return (np.ones((1,self.num_assets))/self.num_assets)*investment_amount
     
-    
-    
-
-# class LongShort(Strategy):
-
-#       def __init__(self,num_long_assets,num_short_assets,rolling_period,hold_period,execution_period):
-       
-#         self.ratio = 
-#         self.results = None
-#         self.array = None
-#         self.num_assets = None
-#         self.num_senarios = None
-#         self.array_transpose = None
-#         self.investment_amount = None
-#         self.results = None
