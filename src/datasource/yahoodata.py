@@ -1,3 +1,4 @@
+from typing import Literal, List
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -5,13 +6,19 @@ import random
 import warnings
 from concurrent.futures import ThreadPoolExecutor
 
-
 class YahooDataSource:
 
     def __init__(self, tickers, start_date, end_date, columns, interval="1d"):
         self.columns = columns
+        
+        if type(start_date) == str:
+            start_date = pd.to_datetime(start_date)
         self.start_date = start_date
+        
+        if type(end_date) == str:
+            end_date = pd.to_datetime(end_date)
         self.end_date = end_date
+        
         self.interval = interval
         self.data = {}
         self.tickers = []
@@ -46,6 +53,7 @@ class YahooDataSource:
             self.tickers.append(ticker)
             data = self.get_yahoo_data(ticker)
             self.data[ticker] = data
+            self.data[ticker].index = self.data[ticker].index.tz_convert(None)
         except Exception as e:
             warnings.warn(f"Failed to get data for {ticker}")
             self.tickers.remove(ticker)
@@ -127,7 +135,6 @@ class YahooDataSource:
     def get_tickers(self, ticker_columns):
 
         return [i.split("_")[0] for i in ticker_columns]
-    
 
     def get_data(self, columns=-1):
 
@@ -143,8 +150,43 @@ class YahooDataSource:
             return
 
         data = pd.DataFrame()
-     
+
         for ticker in self.tickers:
-            data[ticker] = self.data[ticker].loc[:,validated_columns]
+            data[ticker] = self.data[ticker].loc[:, validated_columns]
 
         return data
+
+    def get_data_by_frequency(
+        self, start_date="", end_date="", frequency ="1d", columns: List = []
+    ):
+        
+        if start_date == "":
+            start_date = self.start_date
+            
+        if end_date == "":
+            end_date = self.end_date
+            
+        # check if the start date is less than the end date and the start date is more than or equal the start date of the data source and the end date is less than or equal to the end date of the data source
+        if start_date >= end_date:
+            warnings.warn("Invalid start and end date")
+            return
+        
+        if start_date < self.start_date:
+            warnings.warn("Start date is less than the start date of the data source")
+            return
+        
+        if end_date > self.end_date:
+            warnings.warn("End date is greater than the end date of the data source")
+            return
+        
+        if len(columns) == 0:
+            columns = self.columns
+            
+        data = pd.DataFrame()
+        for ticker in self.tickers:
+            data[ticker] = self.data[ticker].loc[start_date:end_date, columns].resample(frequency).agg({"Close": "last"})
+            # data[ticker] = self.data[ticker].loc[start_date:end_date, columns].asfreq(frequency, method="ffill", how="start")
+            
+        return data
+        
+        

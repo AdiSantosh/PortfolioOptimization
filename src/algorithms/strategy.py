@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from scipy import optimize
 
+from src.datasource.yahoodata import YahooDataSource
+
 
 """
 Contains the definition of abstract class ScenarioGen
@@ -21,46 +23,35 @@ class Strategy(ABC):
         """
 
     @abstractmethod
-    def run_startegy(self,*args,**kwargs):
+    def run_strategy(self,*args,**kwargs):
         """
         Run strategy between this ind
         """
 
 class ConstrainedBasedStrategy(Strategy):
 
-    def run_startegy(self,price_data,test_size=30*3,strategy_frequency=30):
+    def run_strategy(self, data_source:YahooDataSource, test_steps: int = 12, rebalancing_frequency_step: int = 1, start_date: str = None, end_date: str = None, data_frequency: str = '1MS'):
 
         weights_dict = {}
+
+        start_date = start_date if start_date else data_source.start_date
+        end_date = end_date if end_date else data_source.end_date
         
-        min_date = (price_data.index[0])
-        max_date = (price_data.index[-1])
+        date_range = pd.date_range(start_date, end_date, freq=data_frequency)
 
-        date_range = []
-        current_date = min_date + pd.DateOffset(test_size)
-        while current_date < max_date:
-              date_range.append(current_date)
-              current_date  = current_date + pd.DateOffset(strategy_frequency)
+        for index, date in enumerate(date_range[test_steps::rebalancing_frequency_step]):
 
-        for index,date in enumerate(date_range[:-2]):
+            test_start_date = date_range[index*rebalancing_frequency_step]
+            test_end_date = date
 
-            start_date = date - pd.DateOffset(test_size) 
-            end_date = date
+            price_data = data_source.get_data_by_frequency(start_date = test_start_date, end_date = test_end_date, frequency = data_frequency)
+            
+            rtn_data = price_data.pct_change()[1:]
 
-            if end_date <= max_date:
-                pass
-            else:
-                continue
-
-            filtered_price_data = price_data[(price_data.index >= start_date) & (price_data.index <= end_date)]
-            filtered_rtn_data = filtered_price_data.pct_change()[1:]
-
-            wealth_allocations = self.get_optimal_allocations(filtered_rtn_data.T.iloc[:,1:],1)
-            weights_dict[date_range[index+1]] = dict(zip(price_data.columns,wealth_allocations))
+            wealth_allocations = self.get_optimal_allocations(rtn_data.T.iloc[:,1:],1)
+            weights_dict[date] = dict(zip(price_data.columns,wealth_allocations))
 
         return weights_dict
-    
-
-
 
 
 class CvarMretOpt(ConstrainedBasedStrategy):
