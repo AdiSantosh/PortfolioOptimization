@@ -8,8 +8,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 class YahooDataSource:
 
-    def __init__(self, tickers, start_date, end_date, columns, interval="1d"):
+    def __init__(self, tickers, start_date, end_date, columns=["Close"], interval="1d"):
         self.columns = columns
+        
+        if type(tickers) == str:
+            tickers = [tickers]
+        if type(tickers) != list:
+            raise ValueError("Tickers should be either a string or a list")
         
         if type(start_date) == str:
             start_date = pd.to_datetime(start_date)

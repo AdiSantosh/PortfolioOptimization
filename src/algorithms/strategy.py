@@ -51,6 +51,8 @@ class ConstrainedBasedStrategy(Strategy):
             wealth_allocations = self.get_optimal_allocations(rtn_data.T.iloc[:,1:],1)
             weights_dict[date] = dict(zip(price_data.columns,wealth_allocations))
 
+        weights_dict = pd.DataFrame(weights_dict).T
+        weights_dict.index = pd.to_datetime(weights_dict.index)
         return weights_dict
 
 
@@ -175,7 +177,7 @@ class MeanSemidevOpt(ConstrainedBasedStrategy):
         
 
 
-class EqualyWeighted(Strategy):
+class EqualyWeighted(ConstrainedBasedStrategy):
 
     def __init__(self):
     
@@ -191,5 +193,5 @@ class EqualyWeighted(Strategy):
 
         self.array = returns_data.iloc[:, 1:].to_numpy()
         self.num_assets = len(self.array[:,0])
-        return (np.ones((1,self.num_assets))/self.num_assets)*investment_amount
+        return (np.ones(self.num_assets)/self.num_assets)*investment_amount
     
