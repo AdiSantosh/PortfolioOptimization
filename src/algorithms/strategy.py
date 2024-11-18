@@ -3,6 +3,28 @@ import pandas as pd
 import numpy as np
 from scipy import optimize
 
+## NSGA
+import jax.numpy as jnp
+
+from unittest.mock import patch
+import pymoo.gradient.toolbox as anp
+
+with patch("pymoo.gradient.toolbox", new=jnp):
+    from pymoo.algorithms.moo.nsga2 import NSGA2
+    from pymoo.optimize import minimize
+    from pymoo.termination import get_termination
+    from pymoo.core.problem import Problem, ElementwiseProblem
+    from pymoo.operators.sampling.rnd import FloatRandomSampling
+    # from pymoo.operators.selection.tournament import TournamentSelection
+    # from pymoo.operators.selection.rnd import RandomSelection
+    from pymoo.operators.crossover.sbx import SBX
+    from pymoo.operators.mutation.pm import PM
+    # from pymoo.operators.mutation.pm import PolynomialMutation
+    # from pymoo.operators.crossover.pntx import TwoPointCrossover
+    # from pymoo.operators.mutation.bitflip import BitflipMutation
+    # from pymoo.operators.sampling.rnd import BinaryRandomSampling
+    # from pymoo.visualization.scatter import Scatter
+
 from src.datasource.yahoodata import YahooDataSource
 
 
@@ -458,3 +480,42 @@ class MeanVariance(ConstrainedBasedStrategy):
             return result.x
         else:
             raise ValueError("Optimization failed: " + result.message)
+        
+class NSGA(ConstrainedBasedStrategy):
+    
+    class NSGAProblem(Problem):
+        def __init__(self, ret, **kwargs):
+            super().__init__(n_var=ret.shape[0], n_obj=2, n_eq_constr=1, xl=-1, xu=1, **kwargs)
+            self.ret = ret
+
+        def _evaluate(self, x, out, *args, **kwargs):
+            
+            # Objective functions
+            obj_1 = -np.dot(np.mean(self.ret, axis=1), x.T)  # Shape (pop_size,)
+            obj_2 = np.einsum('ij,jk,ik->i', x, np.cov(self.ret, ddof=0), x)  # Shape (pop_size,)
+            
+            # Constraints
+            constr_1 = np.sum(x, axis=1).reshape(-1, 1) - 1  # Shape (pop_size,)
+
+            # Assigning the values to the output
+            out["F"] = np.column_stack([-obj_1, obj_2])
+            out["H"] = constr_1
+
+    def __init__(self, pop_size = 40, n_offsprings = 20, sampling = FloatRandomSampling(), crossover = SBX(prob=0.9, eta=15), mutation = PM(eta=20), eliminate_duplicates = True):
+
+        self.algorithm = NSGA2(pop_size=pop_size,
+                                 n_offsprings=n_offsprings,
+                                 sampling=sampling,
+                                 crossover=crossover,
+                                 mutation=mutation,
+                                 eliminate_duplicates=eliminate_duplicates)
+        
+        self.stop_criteria = get_termination("n_gen", 100)
+
+    def get_optimal_allocations(self,returns_data:pd.DataFrame,investment_amount:int=1):
+
+        self.ret = returns_data.iloc[:, 1:].to_numpy()
+        problem = self.NSGAProblem(self.ret)
+        results = minimize(problem = problem, algorithm = self.algorithm, termination = self.stop_criteria, seed=1, save_history=True, verbose=False)
+        return results.X.flatten()
+    
