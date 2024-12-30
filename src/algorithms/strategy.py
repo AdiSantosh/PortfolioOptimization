@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from scipy import optimize
 
+from copulas.multivariate import VineCopula
+
 ## NSGA
 import jax.numpy as jnp
 
@@ -51,10 +53,22 @@ class Strategy(ABC):
         """
 
 class ConstrainedBasedStrategy(Strategy):
+    
+    def calculate_VaR_CVaR(self,returns_window:pd.DataFrame,weights:np.array, alpha:float=0.99):
+        """
+        Calculate the Value at Risk
+        """
+        portfolio_returns = np.dot(returns_window,weights)
+        VaR = np.percentile(portfolio_returns,100*(1-alpha))
+        CVaR = np.mean(portfolio_returns[portfolio_returns<VaR])
+        return -VaR, -CVaR
+        
 
-    def run_strategy(self, data_source:YahooDataSource, test_steps: int = 12, rebalancing_frequency_step: int = 1, start_date: str = None, end_date: str = None, data_frequency: str = '1MS'):
+    def run_strategy(self, data_source:YahooDataSource, test_steps: int = 12, rebalancing_frequency_step: int = 1, start_date: str = None, end_date: str = None, data_frequency: str = '1MS', use_generated_data: bool = False):
 
         weights_dict = {}
+        VaR_dict = {}
+        CVaR_dict = {}
 
         start_date = start_date if start_date else data_source.start_date
         end_date = end_date if end_date else data_source.end_date
@@ -69,13 +83,25 @@ class ConstrainedBasedStrategy(Strategy):
             price_data = data_source.get_data_by_frequency(start_date = test_start_date, end_date = test_end_date, frequency = data_frequency)
             
             rtn_data = price_data.pct_change()[1:]
+            
+            # generate scenarios using vine copula
+            if use_generated_data:
+                vine = VineCopula("center")
+                vine.fit(np.log(rtn_data))
+                scenarios = vine.sample(100)
 
-            wealth_allocations = self.get_optimal_allocations(rtn_data.T,1)
+            wealth_allocations = self.get_optimal_allocations(scenarios.T if use_generated_data else rtn_data.T,1)
+            
             weights_dict[date] = dict(zip(price_data.columns,wealth_allocations))
+            VaR_dict[date],CVaR_dict[date] = self.calculate_VaR_CVaR(rtn_data,wealth_allocations)
 
         weights_dict = pd.DataFrame(weights_dict).T
         weights_dict.index = pd.to_datetime(weights_dict.index)
-        return weights_dict
+        
+        VaR_dict = pd.DataFrame(VaR_dict,index=["VaR"]).T
+        CVaR_dict = pd.DataFrame(CVaR_dict,index=["CVaR"]).T
+        
+        return weights_dict, VaR_dict, CVaR_dict
 
 
 class CvarMretOpt(ConstrainedBasedStrategy):

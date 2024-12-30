@@ -13,7 +13,7 @@ class BackTest:
         self.method = method
 
     # backtest the strategy and store the results (weights) in the backtest_results attribute
-    def backtest(self, start_date: str, end_date: str, test_steps: int, rebalancing_frequency_step: int, data_frequency: str):
+    def backtest(self, start_date: str, end_date: str, test_steps: int, rebalancing_frequency_step: int, data_frequency: str, use_generated_data: bool = False):
         """ Backtest the strategy and store the results (portfolio value)
 
         Args:
@@ -25,7 +25,7 @@ class BackTest:
         """
         
         # run the strategy to get the weights for the backtest period for each rebalancing period
-        allocated_weights = self.method.run_strategy(self.data_source, test_steps, rebalancing_frequency_step, start_date, end_date, data_frequency)
+        allocated_weights, VaR_historical, CVaR_historical = self.method.run_strategy(self.data_source, test_steps, rebalancing_frequency_step, start_date, end_date, data_frequency, use_generated_data)
         
         # fetch the data for the backtest period and calculate the returns
         data = self.data_source.get_data_by_frequency(start_date, end_date, "1d")
@@ -34,9 +34,13 @@ class BackTest:
         # calculate the stock holding quantity and portfolio value for each day in the backtest period
         stock_holding_quantity = pd.DataFrame(index=data.index, columns=data.columns)
         portfolio_value = pd.DataFrame(index=data.index, columns=["Portfolio Value"])
-        for date, idx in zip(data.index, range(len(data.index))):
+        VaR_value = pd.DataFrame(index=data.index, columns=["VaR"])
+        CVaR_value = pd.DataFrame(index=data.index, columns=["CVaR"])
+        for idx, date in enumerate(data.index):
             if idx == 0:
                 portfolio_value.loc[date] = 1
+                VaR_value.loc[date] = 0
+                CVaR_value.loc[date] = 0
             elif stock_holding_quantity.iloc[idx - 1].sum() == 0:
                 portfolio_value.loc[date] = portfolio_value.iloc[idx - 1]
             else:
@@ -46,16 +50,27 @@ class BackTest:
                 stock_holding_quantity.loc[date] = (allocated_weights.loc[date] / data.loc[date]) * portfolio_value.loc[date, "Portfolio Value"]
             else:
                 stock_holding_quantity.loc[date] = (0 if idx == 0 else stock_holding_quantity.iloc[idx - 1])
+                
+            if date in VaR_historical.index:
+                VaR_value.loc[date] = VaR_historical.loc[date]*portfolio_value.loc[date, "Portfolio Value"]
+                CVaR_value.loc[date] = CVaR_historical.loc[date]*portfolio_value.loc[date, "Portfolio Value"]
             
         # remove all the rows before the first rebalancing date
         self.portfolio_value = portfolio_value[portfolio_value.index >= allocated_weights.index[0]]
+        self.VaR_value = VaR_value[VaR_value.index >= allocated_weights.index[0]].ffill()
+        self.CVaR_value = CVaR_value[CVaR_value.index >= allocated_weights.index[0]].ffill()
+        
+        # self.VaR_value = (VaR_value.ffill().mul(self.portfolio_value))[VaR_value.index >= allocated_weights.index[0]]
+        # self.CVaR_value = (CVaR_value.ffill().mul(self.portfolio_value))[CVaR_value.index >= allocated_weights.index[0]]        
             
         
     def plot_portfolio_returns(self):
         """
         Plot the portfolio returns
         """
-        self.portfolio_value.plot()
+        plot_values = pd.concat([self.portfolio_value, self.VaR_value, self.CVaR_value], axis=1)
+        plot_values.columns = ["Portfolio Value", "VaR", "CVaR"]
+        plot_values.plot(figsize=(12, 8), title="Portfolio Value, VaR and CVaR", grid=True, ylabel="Value", xlabel="Date", legend=True)
         
     
     def calculate_alpha_beta(self):
