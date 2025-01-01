@@ -5,6 +5,7 @@ import statsmodels.api as sm
 
 from src.algorithms.strategy import Strategy
 from src.datasource.yahoodata import YahooDataSource
+from src.scenario.scenario_gen import ScenarioGen
 
 class BackTest:
 
@@ -13,7 +14,7 @@ class BackTest:
         self.method = method
 
     # backtest the strategy and store the results (weights) in the backtest_results attribute
-    def backtest(self, start_date: str, end_date: str, test_steps: int, rebalancing_frequency_step: int, data_frequency: str, use_generated_data: bool = False):
+    def backtest(self, start_date: str, end_date: str, test_steps: int, rebalancing_frequency_step: int, data_frequency: str, scenario_generator: ScenarioGen = None):
         """ Backtest the strategy and store the results (portfolio value)
 
         Args:
@@ -22,10 +23,11 @@ class BackTest:
             test_steps (int): number of steps to run the strategy
             rebalancing_frequency_step (int): frequency of rebalancing the portfolio
             data_frequency (str): frequency of the data
+            scenario_generator (ScenarioGen): instance of the scenario generator
         """
         
         # run the strategy to get the weights for the backtest period for each rebalancing period
-        allocated_weights, VaR_historical, CVaR_historical = self.method.run_strategy(self.data_source, test_steps, rebalancing_frequency_step, start_date, end_date, data_frequency, use_generated_data)
+        allocated_weights, VaR_historical, CVaR_historical = self.method.run_strategy(self.data_source, test_steps, rebalancing_frequency_step, start_date, end_date, data_frequency, scenario_generator)
         
         # fetch the data for the backtest period and calculate the returns
         data = self.data_source.get_data_by_frequency(start_date, end_date, "1d")

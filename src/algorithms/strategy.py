@@ -2,8 +2,8 @@
 import pandas as pd
 import numpy as np
 from scipy import optimize
+from abc import ABC, abstractmethod
 
-from copulas.multivariate import VineCopula
 
 ## NSGA
 import jax.numpy as jnp
@@ -28,12 +28,8 @@ with patch("pymoo.gradient.toolbox", new=jnp):
     # from pymoo.visualization.scatter import Scatter
 
 from src.datasource.yahoodata import YahooDataSource
+from src.scenario.scenario_gen import ScenarioGen
 
-
-"""
-Contains the definition of abstract class ScenarioGen
-"""
-from abc import ABC, abstractmethod
 
 class Strategy(ABC):
     """
@@ -64,7 +60,7 @@ class ConstrainedBasedStrategy(Strategy):
         return -VaR, -CVaR
         
 
-    def run_strategy(self, data_source:YahooDataSource, test_steps: int = 12, rebalancing_frequency_step: int = 1, start_date: str = None, end_date: str = None, data_frequency: str = '1MS', use_generated_data: bool = False):
+    def run_strategy(self, data_source:YahooDataSource, test_steps: int = 12, rebalancing_frequency_step: int = 1, start_date: str = None, end_date: str = None, data_frequency: str = '1MS', scenario_generator: ScenarioGen = None):
 
         weights_dict = {}
         VaR_dict = {}
@@ -85,12 +81,10 @@ class ConstrainedBasedStrategy(Strategy):
             rtn_data = price_data.pct_change()[1:]
             
             # generate scenarios using vine copula
-            if use_generated_data:
-                vine = VineCopula("center")
-                vine.fit(np.log(rtn_data))
-                scenarios = vine.sample(100)
+            if scenario_generator:
+                scenarios = scenario_generator.gen_scenarios(rtn_data)
 
-            wealth_allocations = self.get_optimal_allocations(scenarios.T if use_generated_data else rtn_data.T,1)
+            wealth_allocations = self.get_optimal_allocations(scenarios.T if scenario_generator else rtn_data.T,1)
             
             weights_dict[date] = dict(zip(price_data.columns,wealth_allocations))
             VaR_dict[date],CVaR_dict[date] = self.calculate_VaR_CVaR(rtn_data,wealth_allocations)
@@ -544,4 +538,3 @@ class NSGA(ConstrainedBasedStrategy):
         problem = self.NSGAProblem(self.ret)
         results = minimize(problem = problem, algorithm = self.algorithm, termination = self.stop_criteria, seed=1, save_history=True, verbose=False)
         return results.X.flatten()
-    
