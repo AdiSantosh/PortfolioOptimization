@@ -18,7 +18,7 @@ class PastGen(ScenarioGen):
         Return the data with the given starting_index and ending_index
         """
         if self.use_log_returns:
-            returns = np.log(returns)
+            returns = np.log(returns + 1)
         return returns
     
     # def get_summary(self,data:pd.DataFrame):

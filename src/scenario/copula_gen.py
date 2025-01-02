@@ -30,8 +30,6 @@ class CopulaGen(ScenarioGen):
         Return the data with the given starting_index and ending_index
         """
         if self.use_log_returns:
-            print (returns)
-            returns = np.log(returns)
-            print (returns)
+            returns = np.log(returns + 1)
         self.copula.fit(returns)
         return self.copula.sample(self.sample_size if self.sample_size > 0 else returns.shape[0])

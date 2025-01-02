@@ -481,17 +481,19 @@ class MeanVariance(ConstrainedBasedStrategy):
         constraints = [{'type': 'eq', 'fun': lambda weights: np.sum(weights) - 1}]
         if target_return is not None:
             constraints.append({'type': 'eq', 'fun': lambda weights: np.dot(weights, self.mean_returns) - target_return})
+        
         if allow_shorting:
-            bounds = tuple((float('-inf'), float('inf')) for _ in range(num_assets))  
+            bounds = tuple((float('-inf'), float('inf')) for _ in range(num_assets))
         else:
-            bounds = tuple((0, float('inf')) for _ in range(num_assets))  
+            bounds = tuple((0, float('inf')) for _ in range(num_assets))
+        
         initial_weights = np.ones(num_assets) / num_assets
         result = optimize.minimize(self.minimize_func, initial_weights, method='SLSQP', bounds=bounds, constraints=constraints)
         return result
 
     def get_optimal_allocations(self,returns_data:pd.DataFrame,investment_amount:int=1):
 
-        self.returns =  returns_data.iloc[:, 1:]
+        self.returns =  returns_data.T
         self.mean_returns = self.calculate_mean().to_numpy()
         self.cov_matrix = self.calculate_covariance_matrix().to_numpy()
 
